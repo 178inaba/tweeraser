@@ -1,0 +1,4 @@
+consumer_key = "foo"
+consumer_secret = "bar"
+access_token = "baz"
+access_token_secret = "foobar"
