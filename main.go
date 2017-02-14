@@ -142,13 +142,13 @@ func getMyUserID(api *anaconda.TwitterApi) (int64, error) {
 
 func newEraseTweetService() (model.EraseTweetService, error) {
 	db, err := mysql.Open("root", "", "tweeraser")
-	if err == nil {
-		if db.Ping() == nil {
-			return mysql.NewEraseTweetService(db), nil
-		}
+	if err != nil {
+		return nil, errors.Errorf("Fail db open: %s.", err)
+	}
 
+	if err := db.Ping(); err != nil {
 		return nil, errors.Errorf("Fail db ping: %s.", err)
 	}
 
-	return nil, errors.Errorf("Fail db open: %s.", err)
+	return mysql.NewEraseTweetService(db), nil
 }
