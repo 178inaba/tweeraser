@@ -7,17 +7,32 @@ import (
 	"sync"
 
 	"github.com/178inaba/tweeraser/config"
+	"github.com/178inaba/tweeraser/model"
+	"github.com/178inaba/tweeraser/model/mysql"
 	"github.com/ChimeraCoder/anaconda"
 	log "github.com/Sirupsen/logrus"
+	"github.com/pkg/errors"
 )
 
 const configFilePath = "etc/config.toml"
+
+type client struct {
+	api *anaconda.TwitterApi
+	ets model.EraseTweetService
+}
 
 func main() {
 	api, err := newAPI(configFilePath)
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	ets, err := newEraseTweetService()
+	if err != nil {
+		log.Warn(err)
+	}
+
+	c := client{api: api, ets: ets}
 
 	id, err := getMyUserID(api)
 	if err != nil {
@@ -44,7 +59,7 @@ func main() {
 		wg := new(sync.WaitGroup)
 		for _, tweet := range tweets {
 			wg.Add(1)
-			go deleteTweet(api, tweet.Id, wg, isErrCh)
+			go c.deleteTweet(tweet.Id, wg, isErrCh)
 		}
 
 		wg.Wait()
@@ -71,20 +86,44 @@ func newAPI(path string) (*anaconda.TwitterApi, error) {
 	return anaconda.NewTwitterApi(conf.AccessToken, conf.AccessTokenSecret), nil
 }
 
-func deleteTweet(api *anaconda.TwitterApi, id int64, wg *sync.WaitGroup, isErrCh chan<- bool) {
+func (c client) deleteTweet(id int64, wg *sync.WaitGroup, isErrCh chan<- bool) {
 	defer wg.Done()
 
 	l := log.WithField("id", id)
 
-	_, err := api.DeleteTweet(id, true)
+	t, err := c.api.DeleteTweet(id, true)
 	if err != nil {
-		l.Errorf("Delete fail: %v", err)
+		l.Errorf("Fail delete: %v", err)
 		isErrCh <- true
 		return
 	}
 
+	insertID, err := c.insert(t)
+	if err != nil {
+		l.Errorf("Fail insert: %v", err)
+		isErrCh <- true
+		return
+	} else if insertID != 0 {
+		l = l.WithField("insert_id", insertID)
+	}
+
 	l.Info("Delete success!")
 	isErrCh <- false
+}
+
+func (c client) insert(t anaconda.Tweet) (uint64, error) {
+	var insertID uint64
+	if c.ets != nil {
+		postedAt, err := t.CreatedAtTime()
+		et := &model.EraseTweet{
+			TwitterTweetID: uint64(t.Id), Tweet: t.Text, PostedAt: postedAt}
+		insertID, err = c.ets.Insert(et)
+		if err != nil {
+			return 0, err
+		}
+	}
+
+	return insertID, nil
 }
 
 func getMyUserID(api *anaconda.TwitterApi) (int64, error) {
@@ -99,4 +138,17 @@ func getMyUserID(api *anaconda.TwitterApi) (int64, error) {
 	}
 
 	return u.Id, nil
+}
+
+func newEraseTweetService() (model.EraseTweetService, error) {
+	db, err := mysql.Open("root", "", "tweeraser")
+	if err == nil {
+		if db.Ping() == nil {
+			return mysql.NewEraseTweetService(db), nil
+		}
+
+		return nil, errors.Errorf("Fail db ping: %s.", err)
+	}
+
+	return nil, errors.Errorf("Fail db open: %s.", err)
 }
