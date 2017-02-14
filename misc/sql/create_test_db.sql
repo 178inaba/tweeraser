@@ -1,0 +1,2 @@
+DROP DATABASE IF EXISTS tweeraser_test;
+CREATE DATABASE tweeraser_test CHARACTER SET utf8;
