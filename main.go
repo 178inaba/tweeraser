@@ -170,20 +170,18 @@ func (c tweetEraseClient) eraseTimeline() error {
 	v.Set("contributor_details", "false")
 	v.Set("include_rts", "false")
 
+	var ids []int64
 	for {
 		tweets, err := c.api.GetUserTimeline(v)
 		if err != nil {
 			return err
 		} else if len(tweets) == 0 {
-			return nil
+			return c.eraseIDs(ids)
 		}
 
-		ids := make([]int64, len(tweets))
-		for i, t := range tweets {
-			ids[i] = t.Id
+		for _, t := range tweets {
+			ids = append(ids, t.Id)
 		}
-
-		c.eraseIDs(ids)
 
 		v.Set("max_id", fmt.Sprint(tweets[len(tweets)-1].Id-1))
 	}
