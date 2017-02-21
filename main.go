@@ -1,10 +1,16 @@
 package main
 
 import (
+	"archive/zip"
+	"encoding/csv"
 	"fmt"
+	"io"
 	"net/url"
 	"os"
+	"strconv"
 	"sync"
+
+	kingpin "gopkg.in/alecthomas/kingpin.v2"
 
 	"github.com/178inaba/tweeraser/config"
 	"github.com/178inaba/tweeraser/model"
@@ -16,7 +22,13 @@ import (
 
 const configFilePath = "etc/config.toml"
 
+var (
+	csvFilePath = kingpin.Flag("csv-file", "all tweets csv file (tweets.csv) path.").String()
+	zipFilePath = kingpin.Flag("zip-file", "all tweets zip file path.").String()
+)
+
 func main() {
+	kingpin.Parse()
 	os.Exit(run())
 }
 
@@ -34,7 +46,13 @@ func run() int {
 
 	c := tweetEraseClient{api: api, ets: ets}
 
-	err = c.eraseTimeline()
+	if *csvFilePath != "" {
+		err = c.eraseCsv()
+	} else if *zipFilePath != "" {
+		err = c.eraseZip()
+	} else {
+		err = c.eraseTimeline()
+	}
 	if err != nil {
 		log.Error(err)
 		return 1
@@ -70,6 +88,73 @@ func newEraseTweetService() (model.EraseTweetService, error) {
 type tweetEraseClient struct {
 	api *anaconda.TwitterApi
 	ets model.EraseTweetService
+}
+
+func (c tweetEraseClient) eraseCsv() error {
+	f, err := os.Open(*csvFilePath)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	return c.eraseCsvReader(f)
+}
+
+func (c tweetEraseClient) eraseZip() error {
+	r, err := zip.OpenReader(*zipFilePath)
+	if err != nil {
+		return err
+	}
+	defer r.Close()
+
+	var zf *zip.File
+	for _, f := range r.File {
+		if f.Name == "tweets.csv" {
+			zf = f
+			break
+		}
+	}
+
+	rc, err := zf.Open()
+	if err != nil {
+		return err
+	}
+	defer rc.Close()
+
+	return c.eraseCsvReader(rc)
+}
+
+func (c tweetEraseClient) eraseCsvReader(r io.Reader) error {
+	cr := csv.NewReader(r)
+	header, err := cr.Read()
+	if err != nil {
+		return err
+	}
+
+	var tweetIDIndex int
+	for i, name := range header {
+		if name == "tweet_id" {
+			tweetIDIndex = i
+			break
+		}
+	}
+
+	var ids []int64
+	for {
+		record, err := cr.Read()
+		if err == io.EOF {
+			return c.eraseIDs(ids)
+		} else if err != nil {
+			return err
+		}
+
+		id, err := strconv.ParseInt(record[tweetIDIndex], 10, 64)
+		if err != nil {
+			return err
+		}
+
+		ids = append(ids, id)
+	}
 }
 
 func (c tweetEraseClient) eraseTimeline() error {
