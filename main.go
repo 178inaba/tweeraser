@@ -39,10 +39,19 @@ func run() int {
 
 	c := client{api: api, ets: ets}
 
-	id, err := getMyUserID(api)
+	err = c.deleteTimeline()
 	if err != nil {
 		log.Error(err)
 		return 1
+	}
+
+	return 0
+}
+
+func (c client) deleteTimeline() error {
+	id, err := c.getMyUserID()
+	if err != nil {
+		return err
 	}
 
 	v := url.Values{}
@@ -53,12 +62,11 @@ func run() int {
 	v.Set("include_rts", "false")
 
 	for {
-		tweets, err := api.GetUserTimeline(v)
+		tweets, err := c.api.GetUserTimeline(v)
 		if err != nil {
-			log.Error(err)
-			return 1
+			return err
 		} else if len(tweets) == 0 {
-			return 0
+			return nil
 		}
 
 		ids := make([]int64, len(tweets))
@@ -143,13 +151,13 @@ func (c client) insert(t anaconda.Tweet) (uint64, error) {
 	return insertID, nil
 }
 
-func getMyUserID(api *anaconda.TwitterApi) (int64, error) {
+func (c client) getMyUserID() (int64, error) {
 	v := url.Values{}
 	v.Set("include_entities", "false")
 	v.Set("skip_status", "true")
 	v.Set("include_email", "false")
 
-	u, err := api.GetSelf(v)
+	u, err := c.api.GetSelf(v)
 	if err != nil {
 		return 0, err
 	}
