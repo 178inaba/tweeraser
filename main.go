@@ -22,9 +22,14 @@ type client struct {
 }
 
 func main() {
+	os.Exit(run())
+}
+
+func run() int {
 	api, err := newAPI(configFilePath)
 	if err != nil {
-		log.Fatal(err)
+		log.Error(err)
+		return 1
 	}
 
 	ets, err := newEraseTweetService()
@@ -36,7 +41,8 @@ func main() {
 
 	id, err := getMyUserID(api)
 	if err != nil {
-		log.Fatal(err)
+		log.Error(err)
+		return 1
 	}
 
 	v := url.Values{}
@@ -49,10 +55,10 @@ func main() {
 	for {
 		tweets, err := api.GetUserTimeline(v)
 		if err != nil {
-			log.Fatal(err)
+			log.Error(err)
+			return 1
 		} else if len(tweets) == 0 {
-			os.Exit(0)
-			return
+			return 0
 		}
 
 		isErrCh := make(chan bool, len(tweets))
@@ -67,7 +73,8 @@ func main() {
 
 		for isErr := range isErrCh {
 			if isErr {
-				log.Fatal("An error occurred.")
+				log.Error("An error occurred.")
+				return 1
 			}
 		}
 
