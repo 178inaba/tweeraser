@@ -25,6 +25,7 @@ const configFilePath = "etc/config.toml"
 var (
 	csvFilePath = kingpin.Flag("csv-file", "all tweets csv file (tweets.csv) path.").String()
 	zipFilePath = kingpin.Flag("zip-file", "all tweets zip file path.").String()
+	isNoCheck   = kingpin.Flag("no-check", "no check csv or zip.").Bool()
 )
 
 func main() {
@@ -143,7 +144,11 @@ func (c tweetEraseClient) eraseCsvReader(r io.Reader) error {
 	for {
 		record, err := cr.Read()
 		if err == io.EOF {
-			return c.eraseIDs(ids)
+			if *isNoCheck {
+				return c.eraseIDs(ids)
+			}
+
+			return c.checkBeforeEraseIDs(ids)
 		} else if err != nil {
 			return err
 		}
@@ -155,6 +160,61 @@ func (c tweetEraseClient) eraseCsvReader(r io.Reader) error {
 
 		ids = append(ids, id)
 	}
+}
+
+func (c tweetEraseClient) checkBeforeEraseIDs(ids []int64) error {
+	var idsPackets [][]int64
+	packetSize := 100
+	for packetSize > 0 {
+		idsPackets = append(idsPackets, ids[:packetSize])
+		ids = append(ids[:0], ids[packetSize:]...)
+		checkIDsLen := len(ids)
+		if checkIDsLen < 100 {
+			packetSize = checkIDsLen
+		}
+	}
+
+	log.Info("Checking...")
+	receiveIDsCh := make(chan []int64, len(idsPackets))
+	wg := new(sync.WaitGroup)
+	for i, ip := range idsPackets {
+		wg.Add(1)
+		go c.checkIDs(ip, receiveIDsCh, wg, i)
+	}
+
+	wg.Wait()
+	log.Info("Done!")
+	close(receiveIDsCh)
+
+	var validIDs []int64
+	for receiveIDs := range receiveIDsCh {
+		validIDs = append(validIDs, receiveIDs...)
+	}
+
+	return c.eraseIDs(validIDs)
+}
+
+func (c tweetEraseClient) checkIDs(ids []int64, validIDsCh chan<- []int64, wg *sync.WaitGroup, goroutineIndex int) {
+	defer wg.Done()
+
+	v := url.Values{}
+	v.Set("include_entities", "false")
+	v.Set("trim_user", "false")
+	v.Set("map", "false")
+
+	tweets, err := c.api.GetTweetsLookupByIds(ids, v)
+	if err != nil {
+		log.Error(err)
+		return
+	}
+
+	var validIDs []int64
+	for _, t := range tweets {
+		validIDs = append(validIDs, t.Id)
+	}
+
+	validIDsCh <- validIDs
+	log.Infof("Done %d", goroutineIndex)
 }
 
 func (c tweetEraseClient) eraseTimeline() error {
