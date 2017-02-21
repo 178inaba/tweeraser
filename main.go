@@ -16,7 +16,7 @@ import (
 
 const configFilePath = "etc/config.toml"
 
-type client struct {
+type tweetEraseClient struct {
 	api *anaconda.TwitterApi
 	ets model.EraseTweetService
 }
@@ -37,9 +37,9 @@ func run() int {
 		log.Warn(err)
 	}
 
-	c := client{api: api, ets: ets}
+	c := tweetEraseClient{api: api, ets: ets}
 
-	err = c.deleteTimeline()
+	err = c.eraseTimeline()
 	if err != nil {
 		log.Error(err)
 		return 1
@@ -48,7 +48,7 @@ func run() int {
 	return 0
 }
 
-func (c client) deleteTimeline() error {
+func (c tweetEraseClient) eraseTimeline() error {
 	id, err := c.getMyUserID()
 	if err != nil {
 		return err
@@ -74,18 +74,18 @@ func (c client) deleteTimeline() error {
 			ids[i] = t.Id
 		}
 
-		c.deleteIDs(ids)
+		c.eraseIDs(ids)
 
 		v.Set("max_id", fmt.Sprint(tweets[len(tweets)-1].Id-1))
 	}
 }
 
-func (c client) deleteIDs(ids []int64) error {
+func (c tweetEraseClient) eraseIDs(ids []int64) error {
 	isErrCh := make(chan bool, len(ids))
 	wg := new(sync.WaitGroup)
 	for _, id := range ids {
 		wg.Add(1)
-		go c.deleteTweet(id, wg, isErrCh)
+		go c.eraseTweet(id, wg, isErrCh)
 	}
 
 	wg.Wait()
@@ -111,14 +111,14 @@ func newAPI(path string) (*anaconda.TwitterApi, error) {
 	return anaconda.NewTwitterApi(conf.AccessToken, conf.AccessTokenSecret), nil
 }
 
-func (c client) deleteTweet(id int64, wg *sync.WaitGroup, isErrCh chan<- bool) {
+func (c tweetEraseClient) eraseTweet(id int64, wg *sync.WaitGroup, isErrCh chan<- bool) {
 	defer wg.Done()
 
 	l := log.WithField("id", id)
 
 	t, err := c.api.DeleteTweet(id, true)
 	if err != nil {
-		l.Errorf("Fail delete: %v", err)
+		l.Errorf("Fail erase: %v", err)
 		isErrCh <- true
 		return
 	}
@@ -132,11 +132,11 @@ func (c client) deleteTweet(id int64, wg *sync.WaitGroup, isErrCh chan<- bool) {
 		l = l.WithField("insert_id", insertID)
 	}
 
-	l.Info("Delete success!")
+	l.Info("Erase success!")
 	isErrCh <- false
 }
 
-func (c client) insert(t anaconda.Tweet) (uint64, error) {
+func (c tweetEraseClient) insert(t anaconda.Tweet) (uint64, error) {
 	var insertID uint64
 	if c.ets != nil {
 		postedAt, err := t.CreatedAtTime()
@@ -151,7 +151,7 @@ func (c client) insert(t anaconda.Tweet) (uint64, error) {
 	return insertID, nil
 }
 
-func (c client) getMyUserID() (int64, error) {
+func (c tweetEraseClient) getMyUserID() (int64, error) {
 	v := url.Values{}
 	v.Set("include_entities", "false")
 	v.Set("skip_status", "true")
