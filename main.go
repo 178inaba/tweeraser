@@ -132,7 +132,7 @@ func (c tweetEraseClient) eraseTweet(id int64, wg *sync.WaitGroup, isErrCh chan<
 		l = l.WithField("insert_id", insertID)
 	}
 
-	l.Info("Erase success!")
+	l.Info("Successfully erased!")
 	isErrCh <- false
 }
 
