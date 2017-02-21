@@ -61,25 +61,35 @@ func run() int {
 			return 0
 		}
 
-		isErrCh := make(chan bool, len(tweets))
-		wg := new(sync.WaitGroup)
-		for _, tweet := range tweets {
-			wg.Add(1)
-			go c.deleteTweet(tweet.Id, wg, isErrCh)
+		ids := make([]int64, len(tweets))
+		for i, t := range tweets {
+			ids[i] = t.Id
 		}
 
-		wg.Wait()
-		close(isErrCh)
-
-		for isErr := range isErrCh {
-			if isErr {
-				log.Error("An error occurred.")
-				return 1
-			}
-		}
+		c.deleteIDs(ids)
 
 		v.Set("max_id", fmt.Sprint(tweets[len(tweets)-1].Id-1))
 	}
+}
+
+func (c client) deleteIDs(ids []int64) error {
+	isErrCh := make(chan bool, len(ids))
+	wg := new(sync.WaitGroup)
+	for _, id := range ids {
+		wg.Add(1)
+		go c.deleteTweet(id, wg, isErrCh)
+	}
+
+	wg.Wait()
+	close(isErrCh)
+
+	for isErr := range isErrCh {
+		if isErr {
+			return errors.New("an error occurred")
+		}
+	}
+
+	return nil
 }
 
 func newAPI(path string) (*anaconda.TwitterApi, error) {
