@@ -16,11 +16,6 @@ import (
 
 const configFilePath = "etc/config.toml"
 
-type tweetEraseClient struct {
-	api *anaconda.TwitterApi
-	ets model.EraseTweetService
-}
-
 func main() {
 	os.Exit(run())
 }
@@ -46,6 +41,35 @@ func run() int {
 	}
 
 	return 0
+}
+
+func newAPI(path string) (*anaconda.TwitterApi, error) {
+	conf, err := config.LoadConfig(path)
+	if err != nil {
+		return nil, err
+	}
+
+	anaconda.SetConsumerKey(conf.ConsumerKey)
+	anaconda.SetConsumerSecret(conf.ConsumerSecret)
+	return anaconda.NewTwitterApi(conf.AccessToken, conf.AccessTokenSecret), nil
+}
+
+func newEraseTweetService() (model.EraseTweetService, error) {
+	db, err := mysql.Open("root", "", "tweeraser")
+	if err != nil {
+		return nil, errors.Errorf("Fail db open: %s.", err)
+	}
+
+	if err := db.Ping(); err != nil {
+		return nil, errors.Errorf("Fail db ping: %s.", err)
+	}
+
+	return mysql.NewEraseTweetService(db), nil
+}
+
+type tweetEraseClient struct {
+	api *anaconda.TwitterApi
+	ets model.EraseTweetService
 }
 
 func (c tweetEraseClient) eraseTimeline() error {
@@ -100,17 +124,6 @@ func (c tweetEraseClient) eraseIDs(ids []int64) error {
 	return nil
 }
 
-func newAPI(path string) (*anaconda.TwitterApi, error) {
-	conf, err := config.LoadConfig(path)
-	if err != nil {
-		return nil, err
-	}
-
-	anaconda.SetConsumerKey(conf.ConsumerKey)
-	anaconda.SetConsumerSecret(conf.ConsumerSecret)
-	return anaconda.NewTwitterApi(conf.AccessToken, conf.AccessTokenSecret), nil
-}
-
 func (c tweetEraseClient) eraseTweet(id int64, wg *sync.WaitGroup, isErrCh chan<- bool) {
 	defer wg.Done()
 
@@ -163,17 +176,4 @@ func (c tweetEraseClient) getMyUserID() (int64, error) {
 	}
 
 	return u.Id, nil
-}
-
-func newEraseTweetService() (model.EraseTweetService, error) {
-	db, err := mysql.Open("root", "", "tweeraser")
-	if err != nil {
-		return nil, errors.Errorf("Fail db open: %s.", err)
-	}
-
-	if err := db.Ping(); err != nil {
-		return nil, errors.Errorf("Fail db ping: %s.", err)
-	}
-
-	return mysql.NewEraseTweetService(db), nil
 }
