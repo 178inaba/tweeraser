@@ -14,6 +14,7 @@ CREATE TABLE erase_errors (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   twitter_tweet_id BIGINT UNSIGNED NOT NULL,
   status_code SMALLINT(3) UNSIGNED NOT NULL,
+  error_message TEXT NOT NULL,
   updated_at DATETIME NOT NULL,
   created_at DATETIME NOT NULL,
   PRIMARY KEY (id)

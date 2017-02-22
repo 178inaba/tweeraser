@@ -10,6 +10,7 @@ type EraseError struct {
 	ID             uint64
 	TwitterTweetID uint64
 	StatusCode     uint16
+	ErrorMessage   string
 	UpdatedAt      time.Time
 	CreatedAt      time.Time
 }

@@ -288,14 +288,21 @@ func (c tweetEraseClient) eraseTweet(id int64, wg *sync.WaitGroup, isErrCh chan<
 
 	t, err := c.api.DeleteTweet(id, true)
 	if err != nil {
-		l.Errorf("Fail erase: %v", err)
+		insertID, insertErr := c.insertEraseError(id, err)
+		if insertID != 0 && insertErr == nil {
+			l = l.WithField("insert_id", insertID)
+		} else if insertErr != nil {
+			l.Errorf("Fail erase error insert: %s", insertErr)
+		}
+
+		l.Errorf("Fail erase: %s", err)
 		isErrCh <- true
 		return
 	}
 
-	insertID, err := c.insert(t)
+	insertID, err := c.insertEraseTweet(t)
 	if err != nil {
-		l.Errorf("Fail insert: %v", err)
+		l.Errorf("Fail insert: %s", err)
 		isErrCh <- true
 		return
 	} else if insertID != 0 {
@@ -306,16 +313,40 @@ func (c tweetEraseClient) eraseTweet(id int64, wg *sync.WaitGroup, isErrCh chan<
 	isErrCh <- false
 }
 
-func (c tweetEraseClient) insert(t anaconda.Tweet) (uint64, error) {
-	var insertID uint64
+func (c tweetEraseClient) insertEraseTweet(t anaconda.Tweet) (uint64, error) {
 	if c.ets != nil {
-		postedAt, err := t.CreatedAtTime()
-		et := &model.EraseTweet{
-			TwitterTweetID: uint64(t.Id), Tweet: t.Text, PostedAt: postedAt}
-		insertID, err = c.ets.Insert(et)
-		if err != nil {
-			return 0, err
-		}
+		return 0, nil
+	}
+
+	postedAt, err := t.CreatedAtTime()
+	if err != nil {
+		return 0, err
+	}
+
+	et := &model.EraseTweet{
+		TwitterTweetID: uint64(t.Id), Tweet: t.Text, PostedAt: postedAt}
+	insertID, err := c.ets.Insert(et)
+	if err != nil {
+		return 0, err
+	}
+
+	return insertID, nil
+}
+
+func (c tweetEraseClient) insertEraseError(tweetID int64, err error) (uint64, error) {
+	if c.ees == nil {
+		return 0, nil
+	}
+
+	var statusCode uint16
+	if apiErr, ok := err.(*anaconda.ApiError); ok {
+		statusCode = uint16(apiErr.StatusCode)
+	}
+
+	ee := &model.EraseError{TwitterTweetID: uint64(tweetID), StatusCode: statusCode, ErrorMessage: err.Error()}
+	insertID, err := c.ees.Insert(ee)
+	if err != nil {
+		return 0, err
 	}
 
 	return insertID, nil

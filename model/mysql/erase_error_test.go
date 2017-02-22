@@ -76,7 +76,8 @@ func (s *eraseErrorSuite) TestEraseErrorTweetIDs() {
 }
 
 func (s *eraseErrorSuite) TestInsert() {
-	ee := &model.EraseError{TwitterTweetID: math.MaxUint64, StatusCode: http.StatusNotFound}
+	ee := &model.EraseError{TwitterTweetID: math.MaxUint64,
+		StatusCode: http.StatusNotFound, ErrorMessage: "Error: test."}
 	insertID, err := s.service.Insert(ee)
 	s.NoError(err)
 	s.Equal(uint64(1), insertID)
@@ -88,13 +89,14 @@ func (s *eraseErrorSuite) TestInsert() {
 	var cnt int
 	for rows.Next() {
 		var actual model.EraseError
-		err := rows.Scan(&actual.ID, &actual.TwitterTweetID,
-			&actual.StatusCode, &actual.UpdatedAt, &actual.CreatedAt)
+		err := rows.Scan(&actual.ID, &actual.TwitterTweetID, &actual.StatusCode,
+			&actual.ErrorMessage, &actual.UpdatedAt, &actual.CreatedAt)
 		s.NoError(err)
 
 		s.Equal(insertID, actual.ID)
 		s.Equal(ee.TwitterTweetID, actual.TwitterTweetID)
 		s.Equal(ee.StatusCode, actual.StatusCode)
+		s.Equal(ee.ErrorMessage, actual.ErrorMessage)
 
 		threeSecAgo := time.Now().UTC().Add(-3 * time.Second)
 		s.True(actual.UpdatedAt.After(threeSecAgo))

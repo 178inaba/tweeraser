@@ -57,8 +57,8 @@ func (s EraseErrorService) EraseErrorTweetIDs(ids []uint64) ([]uint64, error) {
 func (s EraseErrorService) Insert(ee *model.EraseError) (uint64, error) {
 	now := time.Now().UTC()
 	query, args, err := sq.Insert(model.EraseErrorTableName).Columns(
-		"twitter_tweet_id", "status_code", "updated_at", "created_at").
-		Values(ee.TwitterTweetID, ee.StatusCode, now, now).ToSql()
+		"twitter_tweet_id", "status_code", "error_message", "updated_at", "created_at").
+		Values(ee.TwitterTweetID, ee.StatusCode, ee.ErrorMessage, now, now).ToSql()
 	if err != nil {
 		return 0, err
 	}
