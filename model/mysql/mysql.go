@@ -19,11 +19,25 @@ func Open(user, addr, dbName string) (*sql.DB, error) {
 	return sql.Open("mysql", c.FormatDSN())
 }
 
-type prepareExecer struct {
+type prepareRunner struct {
 	db *sql.DB
 }
 
-func (r prepareExecer) Exec(query string, args ...interface{}) (sql.Result, error) {
+func (r prepareRunner) Query(query string, args ...interface{}) (*sql.Rows, error) {
+	stmt, err := r.db.Prepare(query)
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := stmt.Query(args...)
+	if err != nil {
+		return nil, err
+	}
+
+	return rows, err
+}
+
+func (r prepareRunner) Exec(query string, args ...interface{}) (sql.Result, error) {
 	stmt, err := r.db.Prepare(query)
 	if err != nil {
 		return nil, err

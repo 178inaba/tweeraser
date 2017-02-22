@@ -42,6 +42,38 @@ func (s *eraseTweetTestSuite) SetupTest() {
 	s.NoError(err)
 }
 
+func (s *eraseTweetTestSuite) TestValidIDs() {
+	cnt := 1000
+	ids := make([]uint64, cnt)
+	dummyIDs := make([]uint64, cnt)
+	for i := 1; i <= cnt; i++ {
+		dummyID := math.MaxUint64 - uint64(i)
+		ids[i-1] = dummyID
+		dummyIDs[i-1] = dummyID
+		et := &model.EraseTweet{TwitterTweetID: dummyID}
+		insertID, err := s.service.Insert(et)
+		s.NoError(err)
+		s.Equal(uint64(i), insertID)
+	}
+
+	ids = append(ids, []uint64{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}...)
+	validIDs, err := s.service.ValidIDs(ids)
+	s.NoError(err)
+	s.Len(validIDs, cnt)
+
+	for _, dummyID := range dummyIDs {
+		var isExist bool
+		for _, validID := range validIDs {
+			if validID == dummyID {
+				isExist = true
+				break
+			}
+		}
+
+		s.True(isExist)
+	}
+}
+
 func (s *eraseTweetTestSuite) TestInsert() {
 	tweet140 := "12345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890"
 	postedAt := time.Now().Add(-24 * time.Hour).UTC()

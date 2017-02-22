@@ -10,25 +10,61 @@ import (
 
 // EraseTweetService is mysql database service.
 type EraseTweetService struct {
-	pe prepareExecer
+	pr prepareRunner
 }
 
 // NewEraseTweetService is create service.
 func NewEraseTweetService(db *sql.DB) EraseTweetService {
-	return EraseTweetService{pe: prepareExecer{db: db}}
+	return EraseTweetService{pr: prepareRunner{db: db}}
+}
+
+// ValidIDs is argument ids validation.
+// return valid ids.
+func (s EraseTweetService) ValidIDs(ids []uint64) ([]uint64, error) {
+	query, args, err := sq.Select("twitter_tweet_id").From(model.EraseTweetTableName).
+		Where(sq.Eq{"twitter_tweet_id": ids}).ToSql()
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := s.pr.Query(query, args...)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	} else if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var validIDs []uint64
+	for rows.Next() {
+		var id uint64
+		err := rows.Scan(&id)
+		if err != nil {
+			return nil, err
+		}
+
+		validIDs = append(validIDs, id)
+	}
+
+	err = rows.Err()
+	if err != nil {
+		return nil, err
+	}
+
+	return validIDs, nil
 }
 
 // Insert is insert erase_tweets table.
 func (s EraseTweetService) Insert(et *model.EraseTweet) (uint64, error) {
 	now := time.Now().UTC()
-	sql, args, err := sq.Insert(model.EraseTweetTableName).Columns(
+	query, args, err := sq.Insert(model.EraseTweetTableName).Columns(
 		"twitter_tweet_id", "tweet", "posted_at", "updated_at", "created_at").
 		Values(et.TwitterTweetID, et.Tweet, et.PostedAt, now, now).ToSql()
 	if err != nil {
 		return 0, err
 	}
 
-	res, err := s.pe.Exec(sql, args...)
+	res, err := s.pr.Exec(query, args...)
 	if err != nil {
 		return 0, err
 	}

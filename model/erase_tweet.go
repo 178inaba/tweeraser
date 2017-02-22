@@ -17,5 +17,6 @@ type EraseTweet struct {
 
 // EraseTweetService is service interface.
 type EraseTweetService interface {
+	ValidIDs(ids []uint64) ([]uint64, error)
 	Insert(et *EraseTweet) (uint64, error)
 }
