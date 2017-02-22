@@ -1,0 +1,14 @@
+language: go
+sudo: false
+addons:
+  mariadb: 10.2
+go:
+  - 1.6
+  - 1.7
+  - tip
+before_install:
+  - mysql < misc/sql/create_test_db.sql
+  - mysql tweeraser_test < misc/sql/ddl.sql
+  - go get -u -v github.com/mattn/goveralls
+script:
+  - $HOME/gopath/bin/goveralls
