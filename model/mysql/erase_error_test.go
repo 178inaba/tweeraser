@@ -43,7 +43,7 @@ func (s *eraseErrorSuite) SetupTest() {
 	s.NoError(err)
 }
 
-func (s *eraseErrorSuite) TestEraseErrorTweetIDs() {
+func (s *eraseErrorSuite) TestTweetNotFoundIDs() {
 	cnt := 1000
 	ids := make([]uint64, cnt)
 	dummyIDs := make([]uint64, cnt)
@@ -57,8 +57,15 @@ func (s *eraseErrorSuite) TestEraseErrorTweetIDs() {
 		s.Equal(uint64(i), insertID)
 	}
 
-	ids = append(ids, []uint64{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}...)
-	tweetIDs, err := s.service.EraseErrorTweetIDs(ids)
+	// Other status.
+	ee := &model.EraseError{TwitterTweetID: 100,
+		StatusCode: http.StatusInternalServerError, ErrorMessage: "Error: status 500."}
+	insertID, err := s.service.Insert(ee)
+	s.NoError(err)
+	s.Equal(uint64(cnt+1), insertID)
+
+	ids = append(ids, []uint64{ee.TwitterTweetID, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10}...)
+	tweetIDs, err := s.service.TweetNotFoundIDs(ids)
 	s.NoError(err)
 	s.Len(tweetIDs, cnt)
 
@@ -77,7 +84,7 @@ func (s *eraseErrorSuite) TestEraseErrorTweetIDs() {
 
 func (s *eraseErrorSuite) TestInsert() {
 	ee := &model.EraseError{TwitterTweetID: math.MaxUint64,
-		StatusCode: http.StatusNotFound, ErrorMessage: "Error: test."}
+		StatusCode: http.StatusNotFound, ErrorMessage: "Error: status 404."}
 	insertID, err := s.service.Insert(ee)
 	s.NoError(err)
 	s.Equal(uint64(1), insertID)

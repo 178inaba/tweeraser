@@ -2,6 +2,7 @@ package mysql
 
 import (
 	"database/sql"
+	"net/http"
 	"time"
 
 	"github.com/178inaba/tweeraser/model"
@@ -18,10 +19,10 @@ func NewEraseErrorService(db *sql.DB) EraseErrorService {
 	return EraseErrorService{pr: prepareRunner{db: db}}
 }
 
-// EraseErrorTweetIDs return erase error tweet ids from argument ids.
-func (s EraseErrorService) EraseErrorTweetIDs(ids []uint64) ([]uint64, error) {
-	query, args, err := sq.Select("twitter_tweet_id").
-		From(model.EraseErrorTableName).Where(sq.Eq{"twitter_tweet_id": ids}).ToSql()
+// TweetNotFoundIDs return not found tweet ids from argument ids.
+func (s EraseErrorService) TweetNotFoundIDs(ids []uint64) ([]uint64, error) {
+	query, args, err := sq.Select("twitter_tweet_id").From(model.EraseErrorTableName).
+		Where(sq.Eq{"twitter_tweet_id": ids, "status_code": http.StatusNotFound}).ToSql()
 	if err != nil {
 		return nil, err
 	}

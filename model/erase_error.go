@@ -17,6 +17,6 @@ type EraseError struct {
 
 // EraseErrorService is erase error service interface.
 type EraseErrorService interface {
-	EraseErrorTweetIDs(ids []uint64) ([]uint64, error)
+	TweetNotFoundIDs(ids []uint64) ([]uint64, error)
 	Insert(ee *EraseError) (uint64, error)
 }
