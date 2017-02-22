@@ -18,9 +18,8 @@ func NewEraseTweetService(db *sql.DB) EraseTweetService {
 	return EraseTweetService{pr: prepareRunner{db: db}}
 }
 
-// ValidIDs is argument ids validation.
-// return valid ids.
-func (s EraseTweetService) ValidIDs(ids []uint64) ([]uint64, error) {
+// AlreadyEraseTweetIDs return already erase ids from argument ids.
+func (s EraseTweetService) AlreadyEraseTweetIDs(ids []uint64) ([]uint64, error) {
 	query, args, err := sq.Select("twitter_tweet_id").From(model.EraseTweetTableName).
 		Where(sq.Eq{"twitter_tweet_id": ids}).ToSql()
 	if err != nil {
@@ -35,7 +34,7 @@ func (s EraseTweetService) ValidIDs(ids []uint64) ([]uint64, error) {
 	}
 	defer rows.Close()
 
-	var validIDs []uint64
+	var tweetIDs []uint64
 	for rows.Next() {
 		var id uint64
 		err := rows.Scan(&id)
@@ -43,7 +42,7 @@ func (s EraseTweetService) ValidIDs(ids []uint64) ([]uint64, error) {
 			return nil, err
 		}
 
-		validIDs = append(validIDs, id)
+		tweetIDs = append(tweetIDs, id)
 	}
 
 	err = rows.Err()
@@ -51,7 +50,7 @@ func (s EraseTweetService) ValidIDs(ids []uint64) ([]uint64, error) {
 		return nil, err
 	}
 
-	return validIDs, nil
+	return tweetIDs, nil
 }
 
 // Insert is insert erase_tweets table.

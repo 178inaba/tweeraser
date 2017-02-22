@@ -42,7 +42,7 @@ func (s *eraseTweetTestSuite) SetupTest() {
 	s.NoError(err)
 }
 
-func (s *eraseTweetTestSuite) TestValidIDs() {
+func (s *eraseTweetTestSuite) TestAlreadyEraseTweetIDs() {
 	cnt := 1000
 	ids := make([]uint64, cnt)
 	dummyIDs := make([]uint64, cnt)
@@ -57,14 +57,14 @@ func (s *eraseTweetTestSuite) TestValidIDs() {
 	}
 
 	ids = append(ids, []uint64{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}...)
-	validIDs, err := s.service.ValidIDs(ids)
+	tweetIDs, err := s.service.AlreadyEraseTweetIDs(ids)
 	s.NoError(err)
-	s.Len(validIDs, cnt)
+	s.Len(tweetIDs, cnt)
 
 	for _, dummyID := range dummyIDs {
 		var isExist bool
-		for _, validID := range validIDs {
-			if validID == dummyID {
+		for _, tweetID := range tweetIDs {
+			if tweetID == dummyID {
 				isExist = true
 				break
 			}
