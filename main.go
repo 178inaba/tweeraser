@@ -300,7 +300,7 @@ func (c tweetEraseClient) eraseTweet(id uint64, wg *sync.WaitGroup, isErrCh chan
 }
 
 func (c tweetEraseClient) insertEraseTweet(t anaconda.Tweet) (uint64, error) {
-	if c.ets != nil {
+	if c.ets == nil {
 		return 0, nil
 	}
 
