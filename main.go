@@ -2,6 +2,7 @@ package main
 
 import (
 	"archive/zip"
+	"database/sql"
 	"encoding/csv"
 	"fmt"
 	"io"
@@ -34,18 +35,11 @@ func main() {
 }
 
 func run() int {
-	api, err := newAPI(configFilePath)
+	c, err := newTweetEraseClient()
 	if err != nil {
 		log.Error(err)
 		return 1
 	}
-
-	ets, err := newEraseTweetService()
-	if err != nil {
-		log.Warn(err)
-	}
-
-	c := tweetEraseClient{api: api, ets: ets}
 
 	if *csvFilePath != "" {
 		err = c.eraseCsv()
@@ -62,6 +56,25 @@ func run() int {
 	return 0
 }
 
+func newTweetEraseClient() (*tweetEraseClient, error) {
+	api, err := newAPI(configFilePath)
+	if err != nil {
+		return nil, err
+	}
+
+	var ets model.EraseTweetService
+	var ees model.EraseErrorService
+	db, err := newDB()
+	if err == nil {
+		ets = mysql.NewEraseTweetService(db)
+		ees = mysql.NewEraseErrorService(db)
+	} else {
+		log.Warn(err)
+	}
+
+	return &tweetEraseClient{api: api, ets: ets, ees: ees}, nil
+}
+
 func newAPI(path string) (*anaconda.TwitterApi, error) {
 	conf, err := config.LoadConfig(path)
 	if err != nil {
@@ -73,7 +86,7 @@ func newAPI(path string) (*anaconda.TwitterApi, error) {
 	return anaconda.NewTwitterApi(conf.AccessToken, conf.AccessTokenSecret), nil
 }
 
-func newEraseTweetService() (model.EraseTweetService, error) {
+func newDB() (*sql.DB, error) {
 	db, err := mysql.Open("root", "", "tweeraser")
 	if err != nil {
 		return nil, errors.Errorf("Fail db open: %s.", err)
@@ -83,12 +96,13 @@ func newEraseTweetService() (model.EraseTweetService, error) {
 		return nil, errors.Errorf("Fail db ping: %s.", err)
 	}
 
-	return mysql.NewEraseTweetService(db), nil
+	return db, nil
 }
 
 type tweetEraseClient struct {
 	api *anaconda.TwitterApi
 	ets model.EraseTweetService
+	ees model.EraseErrorService
 }
 
 func (c tweetEraseClient) eraseCsv() error {
