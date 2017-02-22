@@ -96,7 +96,7 @@ func (s *eraseTweetTestSuite) TestInsert() {
 		s.Equal(insertID, actual.ID)
 		s.Equal(et.TwitterTweetID, actual.TwitterTweetID)
 		s.Equal(et.Tweet, actual.Tweet)
-		s.Equal(et.PostedAt.Truncate(time.Second), actual.PostedAt)
+		s.WithinDuration(et.PostedAt.Truncate(time.Second), actual.PostedAt, 0)
 
 		threeSecAgo := time.Now().UTC().Add(-3 * time.Second)
 		s.True(actual.UpdatedAt.After(threeSecAgo))
