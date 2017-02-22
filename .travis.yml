@@ -5,6 +5,7 @@ addons:
 go:
   - 1.6
   - 1.7
+  - 1.8
   - tip
 before_install:
   - mysql < misc/sql/create_test_db.sql
