@@ -26,7 +26,6 @@ const configFilePath = "etc/config.toml"
 var (
 	csvFilePath = kingpin.Flag("csv-file", "all tweets csv file (tweets.csv) path.").String()
 	zipFilePath = kingpin.Flag("zip-file", "all tweets zip file path.").String()
-	isNoCheck   = kingpin.Flag("no-check", "no check csv or zip.").Bool()
 )
 
 func main() {
@@ -158,10 +157,6 @@ func (c tweetEraseClient) eraseCsvReader(r io.Reader) error {
 	for {
 		record, err := cr.Read()
 		if err == io.EOF {
-			if *isNoCheck {
-				return c.eraseIDs(ids)
-			}
-
 			return c.checkBeforeEraseIDs(ids)
 		} else if err != nil {
 			return err
