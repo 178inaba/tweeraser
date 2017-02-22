@@ -8,3 +8,13 @@ CREATE TABLE erase_tweets (
   created_at DATETIME NOT NULL,
   PRIMARY KEY (id)
 ) ENGINE InnoDB CHARSET utf8;
+
+DROP TABLE IF EXISTS erase_errors;
+CREATE TABLE erase_errors (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  twitter_tweet_id BIGINT UNSIGNED NOT NULL,
+  status_code SMALLINT(3) UNSIGNED NOT NULL,
+  updated_at DATETIME NOT NULL,
+  created_at DATETIME NOT NULL,
+  PRIMARY KEY (id)
+) ENGINE InnoDB CHARSET utf8;
