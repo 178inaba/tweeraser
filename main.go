@@ -154,7 +154,7 @@ func (c tweetEraseClient) eraseCsvReader(r io.Reader) error {
 		}
 	}
 
-	var ids []int64
+	var ids []uint64
 	for {
 		record, err := cr.Read()
 		if err == io.EOF {
@@ -172,63 +172,49 @@ func (c tweetEraseClient) eraseCsvReader(r io.Reader) error {
 			return err
 		}
 
-		ids = append(ids, id)
+		ids = append(ids, uint64(id))
 	}
 }
 
-func (c tweetEraseClient) checkBeforeEraseIDs(ids []int64) error {
-	var idsPackets [][]int64
-	packetSize := 100
-	for packetSize > 0 {
-		idsPackets = append(idsPackets, ids[:packetSize])
-		ids = append(ids[:0], ids[packetSize:]...)
-		checkIDsLen := len(ids)
-		if checkIDsLen < 100 {
-			packetSize = checkIDsLen
+func (c tweetEraseClient) checkBeforeEraseIDs(ids []uint64) error {
+	idsMap := map[uint64]struct{}{}
+	for _, id := range ids {
+		idsMap[id] = struct{}{}
+	}
+
+	inCount := 1000
+	for inCount > 0 {
+		tweetIDs, err := c.ets.AlreadyEraseTweetIDs(ids[:inCount])
+		if err != nil {
+			return err
+		}
+
+		for _, id := range tweetIDs {
+			delete(idsMap, id)
+		}
+
+		notFoundIDs, err := c.ees.TweetNotFoundIDs(ids[:inCount])
+		if err != nil {
+			return err
+		}
+
+		for _, id := range notFoundIDs {
+			delete(idsMap, id)
+		}
+
+		ids = append(ids[:0], ids[inCount:]...)
+		idsLen := len(ids)
+		if idsLen < inCount {
+			inCount = idsLen
 		}
 	}
 
-	log.Info("Checking...")
-	receiveIDsCh := make(chan []int64, len(idsPackets))
-	wg := new(sync.WaitGroup)
-	for i, ip := range idsPackets {
-		wg.Add(1)
-		go c.checkIDs(ip, receiveIDsCh, wg, i)
-	}
-
-	wg.Wait()
-	log.Info("Done!")
-	close(receiveIDsCh)
-
-	var validIDs []int64
-	for receiveIDs := range receiveIDsCh {
-		validIDs = append(validIDs, receiveIDs...)
+	validIDs := make([]uint64, 0, len(idsMap))
+	for id := range idsMap {
+		validIDs = append(validIDs, id)
 	}
 
 	return c.eraseIDs(validIDs)
-}
-
-func (c tweetEraseClient) checkIDs(ids []int64, validIDsCh chan<- []int64, wg *sync.WaitGroup, goroutineIndex int) {
-	defer wg.Done()
-
-	v := url.Values{}
-	v.Set("include_entities", "false")
-	v.Set("trim_user", "false")
-	v.Set("map", "false")
-
-	tweets, err := c.api.GetTweetsLookupByIds(ids, v)
-	if err != nil {
-		log.Error(err)
-		return
-	}
-
-	var validIDs []int64
-	for _, t := range tweets {
-		validIDs = append(validIDs, t.Id)
-	}
-
-	validIDsCh <- validIDs
-	log.Infof("Done %d", goroutineIndex)
 }
 
 func (c tweetEraseClient) eraseTimeline() error {
@@ -244,7 +230,7 @@ func (c tweetEraseClient) eraseTimeline() error {
 	v.Set("contributor_details", "false")
 	v.Set("include_rts", "false")
 
-	var ids []int64
+	var ids []uint64
 	for {
 		tweets, err := c.api.GetUserTimeline(v)
 		if err != nil {
@@ -254,14 +240,14 @@ func (c tweetEraseClient) eraseTimeline() error {
 		}
 
 		for _, t := range tweets {
-			ids = append(ids, t.Id)
+			ids = append(ids, uint64(t.Id))
 		}
 
 		v.Set("max_id", fmt.Sprint(tweets[len(tweets)-1].Id-1))
 	}
 }
 
-func (c tweetEraseClient) eraseIDs(ids []int64) error {
+func (c tweetEraseClient) eraseIDs(ids []uint64) error {
 	isErrCh := make(chan bool, len(ids))
 	wg := new(sync.WaitGroup)
 	for _, id := range ids {
@@ -281,12 +267,12 @@ func (c tweetEraseClient) eraseIDs(ids []int64) error {
 	return nil
 }
 
-func (c tweetEraseClient) eraseTweet(id int64, wg *sync.WaitGroup, isErrCh chan<- bool) {
+func (c tweetEraseClient) eraseTweet(id uint64, wg *sync.WaitGroup, isErrCh chan<- bool) {
 	defer wg.Done()
 
 	l := log.WithField("id", id)
 
-	t, err := c.api.DeleteTweet(id, true)
+	t, err := c.api.DeleteTweet(int64(id), true)
 	if err != nil {
 		insertID, insertErr := c.insertEraseError(id, err)
 		if insertID != 0 && insertErr == nil {
@@ -333,7 +319,7 @@ func (c tweetEraseClient) insertEraseTweet(t anaconda.Tweet) (uint64, error) {
 	return insertID, nil
 }
 
-func (c tweetEraseClient) insertEraseError(tweetID int64, err error) (uint64, error) {
+func (c tweetEraseClient) insertEraseError(tweetID uint64, err error) (uint64, error) {
 	if c.ees == nil {
 		return 0, nil
 	}
@@ -343,7 +329,7 @@ func (c tweetEraseClient) insertEraseError(tweetID int64, err error) (uint64, er
 		statusCode = uint16(apiErr.StatusCode)
 	}
 
-	ee := &model.EraseError{TwitterTweetID: uint64(tweetID), StatusCode: statusCode, ErrorMessage: err.Error()}
+	ee := &model.EraseError{TwitterTweetID: tweetID, StatusCode: statusCode, ErrorMessage: err.Error()}
 	insertID, err := c.ees.Insert(ee)
 	if err != nil {
 		return 0, err
