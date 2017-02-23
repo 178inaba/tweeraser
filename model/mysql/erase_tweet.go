@@ -19,9 +19,9 @@ func NewEraseTweetService(db *sql.DB) EraseTweetService {
 }
 
 // AlreadyEraseTweetIDs return already erase ids from argument ids.
-func (s EraseTweetService) AlreadyEraseTweetIDs(ids []uint64) ([]uint64, error) {
+func (s EraseTweetService) AlreadyEraseTweetIDs(userID uint64, ids []uint64) ([]uint64, error) {
 	query, args, err := sq.Select("twitter_tweet_id").From(model.EraseTweetTableName).
-		Where(sq.Eq{"twitter_tweet_id": ids}).ToSql()
+		Where(sq.Eq{"twitter_user_id": userID, "twitter_tweet_id": ids}).ToSql()
 	if err != nil {
 		return nil, err
 	}
@@ -57,8 +57,8 @@ func (s EraseTweetService) AlreadyEraseTweetIDs(ids []uint64) ([]uint64, error) 
 func (s EraseTweetService) Insert(et *model.EraseTweet) (uint64, error) {
 	now := time.Now().UTC()
 	query, args, err := sq.Insert(model.EraseTweetTableName).Columns(
-		"twitter_tweet_id", "tweet", "posted_at", "updated_at", "created_at").
-		Values(et.TwitterTweetID, et.Tweet, et.PostedAt, now, now).ToSql()
+		"twitter_tweet_id", "tweet", "posted_at", "twitter_user_id", "updated_at", "created_at").
+		Values(et.TwitterTweetID, et.Tweet, et.PostedAt, et.TwitterUserID, now, now).ToSql()
 	if err != nil {
 		return 0, err
 	}

@@ -71,7 +71,20 @@ func newTweetEraseClient() (*tweetEraseClient, error) {
 		log.Warn(err)
 	}
 
-	return &tweetEraseClient{api: api, ets: ets, ees: ees}, nil
+	// Create twitter user.
+	tu, err := model.NewTwitterUser(api)
+	if err != nil {
+		return nil, err
+	}
+
+	// Insert twitter user.
+	err = mysql.NewTwitterUserService(db).Insert(tu)
+	if err != nil {
+		return nil, err
+	}
+
+	return &tweetEraseClient{
+		api: api, user: tu, eraseTweetService: ets, eraseErrorService: ees}, nil
 }
 
 func newAPI(path string) (*anaconda.TwitterApi, error) {
@@ -99,9 +112,10 @@ func newDB() (*sql.DB, error) {
 }
 
 type tweetEraseClient struct {
-	api *anaconda.TwitterApi
-	ets model.EraseTweetService
-	ees model.EraseErrorService
+	api               *anaconda.TwitterApi
+	user              *model.TwitterUser
+	eraseTweetService model.EraseTweetService
+	eraseErrorService model.EraseErrorService
 }
 
 func (c tweetEraseClient) eraseCsv() error {
@@ -179,7 +193,7 @@ func (c tweetEraseClient) checkBeforeEraseIDs(ids []uint64) error {
 
 	inCount := 1000
 	for inCount > 0 {
-		tweetIDs, err := c.ets.AlreadyEraseTweetIDs(ids[:inCount])
+		tweetIDs, err := c.eraseTweetService.AlreadyEraseTweetIDs(c.user.UserID, ids[:inCount])
 		if err != nil {
 			return err
 		}
@@ -188,7 +202,7 @@ func (c tweetEraseClient) checkBeforeEraseIDs(ids []uint64) error {
 			delete(idsMap, id)
 		}
 
-		notFoundIDs, err := c.ees.TweetNotFoundIDs(ids[:inCount])
+		notFoundIDs, err := c.eraseErrorService.TweetNotFoundIDs(ids[:inCount])
 		if err != nil {
 			return err
 		}
@@ -213,13 +227,8 @@ func (c tweetEraseClient) checkBeforeEraseIDs(ids []uint64) error {
 }
 
 func (c tweetEraseClient) eraseTimeline() error {
-	id, err := c.getMyUserID()
-	if err != nil {
-		return err
-	}
-
 	v := url.Values{}
-	v.Set("user_id", fmt.Sprint(id))
+	v.Set("user_id", fmt.Sprint(c.user.UserID))
 	v.Set("count", fmt.Sprint(200))
 	v.Set("trim_user", "true")
 	v.Set("contributor_details", "false")
@@ -295,7 +304,7 @@ func (c tweetEraseClient) eraseTweet(id uint64, wg *sync.WaitGroup, isErrCh chan
 }
 
 func (c tweetEraseClient) insertEraseTweet(t anaconda.Tweet) (uint64, error) {
-	if c.ets == nil {
+	if c.eraseTweetService == nil {
 		return 0, nil
 	}
 
@@ -306,7 +315,7 @@ func (c tweetEraseClient) insertEraseTweet(t anaconda.Tweet) (uint64, error) {
 
 	et := &model.EraseTweet{
 		TwitterTweetID: uint64(t.Id), Tweet: t.Text, PostedAt: postedAt}
-	insertID, err := c.ets.Insert(et)
+	insertID, err := c.eraseTweetService.Insert(et)
 	if err != nil {
 		return 0, err
 	}
@@ -315,7 +324,7 @@ func (c tweetEraseClient) insertEraseTweet(t anaconda.Tweet) (uint64, error) {
 }
 
 func (c tweetEraseClient) insertEraseError(tweetID uint64, err error) (uint64, error) {
-	if c.ees == nil {
+	if c.eraseErrorService == nil {
 		return 0, nil
 	}
 
@@ -325,24 +334,10 @@ func (c tweetEraseClient) insertEraseError(tweetID uint64, err error) (uint64, e
 	}
 
 	ee := &model.EraseError{TwitterTweetID: tweetID, StatusCode: statusCode, ErrorMessage: err.Error()}
-	insertID, err := c.ees.Insert(ee)
+	insertID, err := c.eraseErrorService.Insert(ee)
 	if err != nil {
 		return 0, err
 	}
 
 	return insertID, nil
-}
-
-func (c tweetEraseClient) getMyUserID() (int64, error) {
-	v := url.Values{}
-	v.Set("include_entities", "false")
-	v.Set("skip_status", "true")
-	v.Set("include_email", "false")
-
-	u, err := c.api.GetSelf(v)
-	if err != nil {
-		return 0, err
-	}
-
-	return u.Id, nil
 }

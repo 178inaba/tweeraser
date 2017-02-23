@@ -11,12 +11,13 @@ type EraseTweet struct {
 	TwitterTweetID uint64
 	Tweet          string
 	PostedAt       time.Time
+	TwitterUserID  uint64
 	UpdatedAt      time.Time
 	CreatedAt      time.Time
 }
 
 // EraseTweetService is service interface.
 type EraseTweetService interface {
-	AlreadyEraseTweetIDs(ids []uint64) ([]uint64, error)
+	AlreadyEraseTweetIDs(userID uint64, ids []uint64) ([]uint64, error)
 	Insert(et *EraseTweet) (uint64, error)
 }
