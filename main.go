@@ -231,8 +231,9 @@ func (c tweetEraseClient) eraseTimeline() error {
 	v.Set("user_id", fmt.Sprint(c.user.UserID))
 	v.Set("count", fmt.Sprint(200))
 	v.Set("trim_user", "true")
+	v.Set("exclude_replies", "false")
 	v.Set("contributor_details", "false")
-	v.Set("include_rts", "false")
+	v.Set("include_rts", "true")
 
 	var ids []uint64
 	for {
