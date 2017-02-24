@@ -73,6 +73,27 @@ func (s *twitterUserSuite) TestInsertUpdate() {
 
 	s.Equal(1, cnt)
 	s.NoError(rows.Err())
+
+	// Duplicate update.
+	tu = &model.TwitterUser{UserID: math.MaxUint64, Name: "name_dup"}
+	err = s.service.InsertUpdate(tu)
+	s.NoError(err)
+
+	rows, err = sq.Select("name").
+		From(model.TwitterUserTableName).RunWith(s.db).Query()
+	s.NoError(err)
+
+	cnt = 0
+	for rows.Next() {
+		var actual model.TwitterUser
+		err := rows.Scan(&actual.Name)
+		s.NoError(err)
+		s.Equal(tu.Name, actual.Name)
+		cnt++
+	}
+
+	s.Equal(1, cnt)
+	s.NoError(rows.Err())
 }
 
 func (s *twitterUserSuite) TearDownSuite() {
