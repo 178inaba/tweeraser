@@ -322,7 +322,7 @@ func (c tweetEraseClient) insertEraseTweet(t anaconda.Tweet) (uint64, error) {
 	}
 
 	et := &model.EraseTweet{
-		TwitterTweetID: uint64(t.Id), Tweet: t.Text, PostedAt: postedAt}
+		TwitterTweetID: uint64(t.Id), Tweet: t.Text, PostedAt: postedAt, TwitterUserID: uint64(t.User.Id)}
 	insertID, err := c.eraseTweetService.Insert(et)
 	if err != nil {
 		return 0, err
