@@ -108,6 +108,10 @@ func newDB() (*sql.DB, error) {
 		return nil, errors.Errorf("Fail db ping: %s.", err)
 	}
 
+	if err := mysql.SetMaxOpenConnsFromDB(db, 90); err != nil {
+		return nil, err
+	}
+
 	return db, nil
 }
 

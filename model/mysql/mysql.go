@@ -77,3 +77,19 @@ func (r *row) Scan(dest ...interface{}) error {
 
 	return r.RowScanner.Scan(dest...)
 }
+
+// SetMaxOpenConnsFromDB set max open connections from database configuration.
+// Can specify the percentage.
+// If 0 is specified for percentage, 0 is set.
+func SetMaxOpenConnsFromDB(db *sql.DB, percentage int) error {
+	// Get database max conns.
+	var maxConns int
+	err := db.QueryRow("SELECT @@max_connections").Scan(&maxConns)
+	if err != nil {
+		return err
+	}
+
+	// Set.
+	db.SetMaxOpenConns(maxConns * percentage / 100)
+	return nil
+}
