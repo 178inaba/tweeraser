@@ -304,7 +304,8 @@ func (c tweetEraseClient) eraseTweet(id uint64, wg *sync.WaitGroup, isErrCh chan
 			return
 		}
 
-		l = l.WithFields(log.Fields{"insert_id": insertID, "tweet": t.Text, "posted_at": postedAt})
+		l = l.WithFields(log.Fields{"insert_id": insertID,
+			"tweet": t.Text, "posted_at": postedAt.Format("2006-01-02 15:04:05")})
 	}
 
 	l.Info("Successfully erased!")
@@ -321,8 +322,8 @@ func (c tweetEraseClient) insertEraseTweet(t anaconda.Tweet) (uint64, error) {
 		return 0, err
 	}
 
-	et := &model.EraseTweet{
-		TwitterTweetID: uint64(t.Id), Tweet: t.Text, PostedAt: postedAt, TwitterUserID: uint64(t.User.Id)}
+	et := &model.EraseTweet{TwitterTweetID: uint64(t.Id),
+		Tweet: t.Text, PostedAt: postedAt, TwitterUserID: uint64(t.User.Id)}
 	insertID, err := c.eraseTweetService.Insert(et)
 	if err != nil {
 		return 0, err
