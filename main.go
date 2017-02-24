@@ -297,7 +297,14 @@ func (c tweetEraseClient) eraseTweet(id uint64, wg *sync.WaitGroup, isErrCh chan
 		isErrCh <- true
 		return
 	} else if insertID != 0 {
-		l = l.WithField("insert_id", insertID)
+		postedAt, err := t.CreatedAtTime()
+		if err != nil {
+			l.Errorf("Fail parse posted at: %s", err)
+			isErrCh <- true
+			return
+		}
+
+		l = l.WithFields(log.Fields{"insert_id": insertID, "tweet": t.Text, "posted_at": postedAt})
 	}
 
 	l.Info("Successfully erased!")
