@@ -78,7 +78,7 @@ func newTweetEraseClient() (*tweetEraseClient, error) {
 	}
 
 	// Insert twitter user.
-	err = mysql.NewTwitterUserService(db).Insert(tu)
+	err = mysql.NewTwitterUserService(db).InsertUpdate(tu)
 	if err != nil {
 		return nil, err
 	}
