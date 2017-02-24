@@ -36,7 +36,21 @@ func NewTwitterUser(api *anaconda.TwitterApi) (*TwitterUser, error) {
 		ScreenName: u.ScreenName, Name: u.Name, Lang: u.Lang}, nil
 }
 
+// CheckWantUpdate checks if it needs updating compared with the argument object.
+// Target data to be updated if there is a difference: ScreenName, Name, Lang.
+func (t *TwitterUser) CheckWantUpdate(tu *TwitterUser) bool {
+	if t.ScreenName != tu.ScreenName {
+		return true
+	} else if t.Name != tu.Name {
+		return true
+	} else if t.Lang != tu.Lang {
+		return true
+	}
+
+	return false
+}
+
 // TwitterUserService is twitter user service interface.
 type TwitterUserService interface {
-	Insert(tu *TwitterUser) error
+	InsertUpdate(tu *TwitterUser) error
 }

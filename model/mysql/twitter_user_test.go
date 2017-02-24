@@ -42,10 +42,10 @@ func (s *twitterUserSuite) SetupTest() {
 	s.NoError(err)
 }
 
-func (s *twitterUserSuite) TestInsert() {
+func (s *twitterUserSuite) TestInsertUpdate() {
 	tu := &model.TwitterUser{UserID: math.MaxUint64,
 		ScreenName: "screen_name", Name: "name", Lang: "en"}
-	err := s.service.Insert(tu)
+	err := s.service.InsertUpdate(tu)
 	s.NoError(err)
 
 	rows, err := sq.Select("*").

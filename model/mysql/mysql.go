@@ -3,8 +3,13 @@ package mysql
 import (
 	"database/sql"
 
+	sq "github.com/Masterminds/squirrel"
 	"github.com/go-sql-driver/mysql"
 )
+
+type beginner interface {
+	Begin() (*sql.Tx, error)
+}
 
 // Open is open mysql connection.
 func Open(user, addr, dbName string) (*sql.DB, error) {
@@ -20,11 +25,11 @@ func Open(user, addr, dbName string) (*sql.DB, error) {
 }
 
 type prepareRunner struct {
-	db *sql.DB
+	preparer sq.Preparer
 }
 
 func (r prepareRunner) Query(query string, args ...interface{}) (*sql.Rows, error) {
-	stmt, err := r.db.Prepare(query)
+	stmt, err := r.preparer.Prepare(query)
 	if err != nil {
 		return nil, err
 	}
@@ -38,7 +43,7 @@ func (r prepareRunner) Query(query string, args ...interface{}) (*sql.Rows, erro
 }
 
 func (r prepareRunner) Exec(query string, args ...interface{}) (sql.Result, error) {
-	stmt, err := r.db.Prepare(query)
+	stmt, err := r.preparer.Prepare(query)
 	if err != nil {
 		return nil, err
 	}
@@ -49,4 +54,26 @@ func (r prepareRunner) Exec(query string, args ...interface{}) (sql.Result, erro
 	}
 
 	return res, err
+}
+
+func (r prepareRunner) QueryRow(query string, args ...interface{}) sq.RowScanner {
+	stmt, err := r.preparer.Prepare(query)
+	if err != nil {
+		return &row{err: err}
+	}
+
+	return &row{RowScanner: stmt.QueryRow(args...)}
+}
+
+type row struct {
+	sq.RowScanner
+	err error
+}
+
+func (r *row) Scan(dest ...interface{}) error {
+	if r.err != nil {
+		return r.err
+	}
+
+	return r.RowScanner.Scan(dest...)
 }

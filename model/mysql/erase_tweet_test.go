@@ -47,7 +47,7 @@ func (s *eraseTweetTestSuite) SetupTest() {
 	tus := mysql.NewTwitterUserService(s.db)
 	for _, uid := range []uint64{1, 2, math.MaxUint64} {
 		tu := &model.TwitterUser{UserID: uid}
-		err = tus.Insert(tu)
+		err = tus.InsertUpdate(tu)
 		s.NoError(err)
 	}
 }
