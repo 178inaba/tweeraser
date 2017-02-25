@@ -20,9 +20,10 @@ func NewEraseErrorService(db *sql.DB) EraseErrorService {
 }
 
 // TweetNotFoundIDs return not found tweet ids from argument ids.
-func (s EraseErrorService) TweetNotFoundIDs(ids []uint64) ([]uint64, error) {
+func (s EraseErrorService) TweetNotFoundIDs(userID uint64, ids []uint64) ([]uint64, error) {
 	query, args, err := sq.Select("twitter_tweet_id").From(model.EraseErrorTableName).
-		Where(sq.Eq{"twitter_tweet_id": ids, "status_code": http.StatusNotFound}).ToSql()
+		Where(sq.Eq{"tried_twitter_user_id": userID,
+			"status_code": http.StatusNotFound, "twitter_tweet_id": ids}).ToSql()
 	if err != nil {
 		return nil, err
 	}
@@ -58,8 +59,9 @@ func (s EraseErrorService) TweetNotFoundIDs(ids []uint64) ([]uint64, error) {
 func (s EraseErrorService) Insert(ee *model.EraseError) (uint64, error) {
 	now := time.Now().UTC()
 	query, args, err := sq.Insert(model.EraseErrorTableName).Columns(
-		"twitter_tweet_id", "status_code", "error_message", "updated_at", "created_at").
-		Values(ee.TwitterTweetID, ee.StatusCode, ee.ErrorMessage, now, now).ToSql()
+		"tried_twitter_user_id", "twitter_tweet_id",
+		"status_code", "error_message", "updated_at", "created_at").
+		Values(ee.TriedTwitterUserID, ee.TwitterTweetID, ee.StatusCode, ee.ErrorMessage, now, now).ToSql()
 	if err != nil {
 		return 0, err
 	}

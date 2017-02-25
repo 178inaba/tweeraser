@@ -39,11 +39,22 @@ func (s *eraseErrorSuite) SetupTest() {
 	s.NoError(err)
 	_, err = s.db.Exec(fmt.Sprintf("TRUNCATE TABLE %s", model.EraseErrorTableName))
 	s.NoError(err)
+	_, err = s.db.Exec(fmt.Sprintf("TRUNCATE TABLE %s", model.TwitterUserTableName))
+	s.NoError(err)
 	_, err = s.db.Exec("SET FOREIGN_KEY_CHECKS = 1")
 	s.NoError(err)
+
+	// Create test twitter users.
+	tus := mysql.NewTwitterUserService(s.db)
+	for _, uid := range []uint64{1, 2, math.MaxUint64} {
+		tu := &model.TwitterUser{UserID: uid}
+		err = tus.InsertUpdate(tu)
+		s.NoError(err)
+	}
 }
 
 func (s *eraseErrorSuite) TestTweetNotFoundIDs() {
+	userID := uint64(1)
 	cnt := 1000
 	ids := make([]uint64, cnt)
 	dummyIDs := make([]uint64, cnt)
@@ -51,21 +62,28 @@ func (s *eraseErrorSuite) TestTweetNotFoundIDs() {
 		dummyID := math.MaxUint64 - uint64(i)
 		ids[i-1] = dummyID
 		dummyIDs[i-1] = dummyID
-		ee := &model.EraseError{TwitterTweetID: dummyID, StatusCode: http.StatusNotFound}
+		ee := &model.EraseError{TriedTwitterUserID: userID, TwitterTweetID: dummyID, StatusCode: http.StatusNotFound}
 		insertID, err := s.service.Insert(ee)
 		s.NoError(err)
 		s.Equal(uint64(i), insertID)
 	}
 
 	// Other status.
-	ee := &model.EraseError{TwitterTweetID: 100,
+	ee := &model.EraseError{TriedTwitterUserID: userID, TwitterTweetID: 100,
 		StatusCode: http.StatusInternalServerError, ErrorMessage: "Error: status 500."}
 	insertID, err := s.service.Insert(ee)
 	s.NoError(err)
 	s.Equal(uint64(cnt+1), insertID)
 
+	// Other user.
+	ee = &model.EraseError{TriedTwitterUserID: 2, TwitterTweetID: 100,
+		StatusCode: http.StatusNotFound, ErrorMessage: "Error: status 404."}
+	insertID, err = s.service.Insert(ee)
+	s.NoError(err)
+	s.Equal(uint64(cnt+2), insertID)
+
 	ids = append(ids, []uint64{ee.TwitterTweetID, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10}...)
-	tweetIDs, err := s.service.TweetNotFoundIDs(ids)
+	tweetIDs, err := s.service.TweetNotFoundIDs(userID, ids)
 	s.NoError(err)
 	s.Len(tweetIDs, cnt)
 
@@ -83,7 +101,7 @@ func (s *eraseErrorSuite) TestTweetNotFoundIDs() {
 }
 
 func (s *eraseErrorSuite) TestInsert() {
-	ee := &model.EraseError{TwitterTweetID: math.MaxUint64,
+	ee := &model.EraseError{TriedTwitterUserID: math.MaxUint64, TwitterTweetID: math.MaxUint64,
 		StatusCode: http.StatusNotFound, ErrorMessage: "Error: status 404."}
 	insertID, err := s.service.Insert(ee)
 	s.NoError(err)
@@ -96,11 +114,12 @@ func (s *eraseErrorSuite) TestInsert() {
 	var cnt int
 	for rows.Next() {
 		var actual model.EraseError
-		err := rows.Scan(&actual.ID, &actual.TwitterTweetID, &actual.StatusCode,
+		err := rows.Scan(&actual.ID, &actual.TriedTwitterUserID, &actual.TwitterTweetID, &actual.StatusCode,
 			&actual.ErrorMessage, &actual.UpdatedAt, &actual.CreatedAt)
 		s.NoError(err)
 
 		s.Equal(insertID, actual.ID)
+		s.Equal(ee.TriedTwitterUserID, actual.TriedTwitterUserID)
 		s.Equal(ee.TwitterTweetID, actual.TwitterTweetID)
 		s.Equal(ee.StatusCode, actual.StatusCode)
 		s.Equal(ee.ErrorMessage, actual.ErrorMessage)

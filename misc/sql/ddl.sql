@@ -25,6 +25,7 @@ CREATE TABLE erase_tweets (
 DROP TABLE IF EXISTS erase_errors;
 CREATE TABLE erase_errors (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  tried_twitter_user_id BIGINT UNSIGNED NOT NULL,
   twitter_tweet_id BIGINT UNSIGNED NOT NULL,
   status_code SMALLINT(3) UNSIGNED NOT NULL,
   error_message TEXT NOT NULL,

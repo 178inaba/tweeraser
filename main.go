@@ -209,7 +209,7 @@ func (c tweetEraseClient) checkBeforeEraseIDs(ids []uint64) error {
 			delete(idsMap, id)
 		}
 
-		notFoundIDs, err := c.eraseErrorService.TweetNotFoundIDs(ids[:inCount])
+		notFoundIDs, err := c.eraseErrorService.TweetNotFoundIDs(c.user.UserID, ids[:inCount])
 		if err != nil {
 			return err
 		}
@@ -260,26 +260,27 @@ func (c tweetEraseClient) eraseTimeline() error {
 }
 
 func (c tweetEraseClient) eraseIDs(ids []uint64) error {
-	isErrCh := make(chan bool, len(ids))
-	wg := new(sync.WaitGroup)
-	for _, id := range ids {
-		wg.Add(1)
-		go c.eraseTweet(id, wg, isErrCh)
-	}
+	trialCnt := 1000
+	for trialCnt > 0 {
+		wg := new(sync.WaitGroup)
+		for _, id := range ids[:trialCnt] {
+			wg.Add(1)
+			go c.eraseTweet(id, wg)
+		}
 
-	wg.Wait()
-	close(isErrCh)
+		wg.Wait()
 
-	for isErr := range isErrCh {
-		if isErr {
-			return errors.New("an error occurred")
+		ids = append(ids[:0], ids[trialCnt:]...)
+		idsLen := len(ids)
+		if idsLen < trialCnt {
+			trialCnt = idsLen
 		}
 	}
 
 	return nil
 }
 
-func (c tweetEraseClient) eraseTweet(id uint64, wg *sync.WaitGroup, isErrCh chan<- bool) {
+func (c tweetEraseClient) eraseTweet(id uint64, wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	l := log.WithField("id", id)
@@ -288,7 +289,6 @@ func (c tweetEraseClient) eraseTweet(id uint64, wg *sync.WaitGroup, isErrCh chan
 	api, err := newAPI(c.config)
 	if err != nil {
 		l.Errorf("Fail create api: %s", err)
-		isErrCh <- true
 		return
 	}
 	defer api.Close()
@@ -303,20 +303,17 @@ func (c tweetEraseClient) eraseTweet(id uint64, wg *sync.WaitGroup, isErrCh chan
 		}
 
 		l.Errorf("Fail erase: %s", err)
-		isErrCh <- true
 		return
 	}
 
 	insertID, err := c.insertEraseTweet(t)
 	if err != nil {
-		l.Errorf("Fail insert: %s", err)
-		isErrCh <- true
+		l.Errorf("Fail erase tweet insert: %s", err)
 		return
 	} else if insertID != 0 {
 		postedAt, err := t.CreatedAtTime()
 		if err != nil {
 			l.Errorf("Fail parse posted at: %s", err)
-			isErrCh <- true
 			return
 		}
 
@@ -325,7 +322,6 @@ func (c tweetEraseClient) eraseTweet(id uint64, wg *sync.WaitGroup, isErrCh chan
 	}
 
 	l.Info("Successfully erased!")
-	isErrCh <- false
 }
 
 func (c tweetEraseClient) insertEraseTweet(t anaconda.Tweet) (uint64, error) {
@@ -358,7 +354,7 @@ func (c tweetEraseClient) insertEraseError(tweetID uint64, err error) (uint64, e
 		statusCode = uint16(apiErr.StatusCode)
 	}
 
-	ee := &model.EraseError{TwitterTweetID: tweetID, StatusCode: statusCode, ErrorMessage: err.Error()}
+	ee := &model.EraseError{TriedTwitterUserID: c.user.UserID, TwitterTweetID: tweetID, StatusCode: statusCode, ErrorMessage: err.Error()}
 	insertID, err := c.eraseErrorService.Insert(ee)
 	if err != nil {
 		return 0, err
