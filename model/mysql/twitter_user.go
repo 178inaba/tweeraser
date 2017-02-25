@@ -12,12 +12,13 @@ import (
 // TwitterUserService is twitter user table service.
 type TwitterUserService struct {
 	preparer sq.Preparer
+	pr       prepareRunner
 }
 
 // NewTwitterUserService is create twitter user service.
 // When calling InsertUpdate, specify an object implementing `Begin() (*sql.Tx, error)` (e.g. *sql.DB) as an argument.
 func NewTwitterUserService(preparer sq.Preparer) TwitterUserService {
-	return TwitterUserService{preparer: preparer}
+	return TwitterUserService{preparer: preparer, pr: newPrepareRunner(preparer)}
 }
 
 // InsertUpdate inserts if there is no line corresponding to the primary key, and updates if it does.
@@ -51,24 +52,10 @@ func (s TwitterUserService) InsertUpdate(tu *model.TwitterUser) (err error) {
 		}
 	}()
 
-	// Select for update.
-	query, args, err := sq.Select("*").From(model.TwitterUserTableName).
-		Where(sq.Eq{"user_id": tu.UserID}).Suffix("FOR UPDATE").ToSql()
-	if err != nil {
-		return err
-	}
-
-	row := prepareRunner{preparer: tx}.QueryRow(query, args...)
-	if err != nil {
-		return err
-	}
-
 	txService := NewTwitterUserService(tx)
 
 	// Exist?
-	dbtu := &model.TwitterUser{}
-	err = row.Scan(&dbtu.UserID, &dbtu.ScreenName,
-		&dbtu.Name, &dbtu.Lang, &dbtu.UpdatedAt, &dbtu.CreatedAt)
+	dbtu, err := txService.selectForUpdate(tu.UserID)
 	if err == sql.ErrNoRows {
 		// Not Exist.
 		// Insert.
@@ -99,7 +86,7 @@ func (s TwitterUserService) insert(tu *model.TwitterUser) error {
 		return err
 	}
 
-	_, err = prepareRunner{preparer: s.preparer}.Exec(query, args...)
+	_, err = s.pr.Exec(query, args...)
 	if err != nil {
 		return err
 	}
@@ -117,7 +104,7 @@ func (s TwitterUserService) update(tu *model.TwitterUser) error {
 		return err
 	}
 
-	res, err := prepareRunner{preparer: s.preparer}.Exec(query, args...)
+	res, err := s.pr.Exec(query, args...)
 	if err != nil {
 		return err
 	}
@@ -132,4 +119,21 @@ func (s TwitterUserService) update(tu *model.TwitterUser) error {
 	}
 
 	return nil
+}
+
+func (s TwitterUserService) selectForUpdate(userID uint64) (*model.TwitterUser, error) {
+	query, args, err := sq.Select("*").From(model.TwitterUserTableName).
+		Where(sq.Eq{"user_id": userID}).Suffix("FOR UPDATE").ToSql()
+	if err != nil {
+		return nil, err
+	}
+
+	tu := &model.TwitterUser{}
+	err = s.pr.QueryRow(query, args...).Scan(&tu.UserID,
+		&tu.ScreenName, &tu.Name, &tu.Lang, &tu.UpdatedAt, &tu.CreatedAt)
+	if err != nil {
+		return nil, err
+	}
+
+	return tu, nil
 }

@@ -26,40 +26,46 @@ func Open(user, addr, dbName string) (*sql.DB, error) {
 
 type prepareRunner struct {
 	preparer sq.Preparer
+	canClose bool
+}
+
+func newPrepareRunner(preparer sq.Preparer) prepareRunner {
+	canClose := false
+	if _, ok := preparer.(*sql.DB); ok {
+		canClose = true
+	}
+
+	return prepareRunner{preparer: preparer, canClose: canClose}
 }
 
 func (r prepareRunner) Query(query string, args ...interface{}) (*sql.Rows, error) {
 	stmt, err := r.preparer.Prepare(query)
 	if err != nil {
 		return nil, err
+	} else if r.canClose {
+		defer stmt.Close()
 	}
 
-	rows, err := stmt.Query(args...)
-	if err != nil {
-		return nil, err
-	}
-
-	return rows, err
+	return stmt.Query(args...)
 }
 
 func (r prepareRunner) Exec(query string, args ...interface{}) (sql.Result, error) {
 	stmt, err := r.preparer.Prepare(query)
 	if err != nil {
 		return nil, err
+	} else if r.canClose {
+		defer stmt.Close()
 	}
 
-	res, err := stmt.Exec(args...)
-	if err != nil {
-		return nil, err
-	}
-
-	return res, err
+	return stmt.Exec(args...)
 }
 
 func (r prepareRunner) QueryRow(query string, args ...interface{}) sq.RowScanner {
 	stmt, err := r.preparer.Prepare(query)
 	if err != nil {
 		return &row{err: err}
+	} else if r.canClose {
+		defer stmt.Close()
 	}
 
 	return &row{RowScanner: stmt.QueryRow(args...)}

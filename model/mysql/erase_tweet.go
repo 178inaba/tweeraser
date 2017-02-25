@@ -15,7 +15,7 @@ type EraseTweetService struct {
 
 // NewEraseTweetService is create service.
 func NewEraseTweetService(db *sql.DB) EraseTweetService {
-	return EraseTweetService{pr: prepareRunner{preparer: db}}
+	return EraseTweetService{pr: newPrepareRunner(db)}
 }
 
 // AlreadyEraseTweetIDs return already erase ids from argument ids.

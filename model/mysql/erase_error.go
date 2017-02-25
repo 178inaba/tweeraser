@@ -16,7 +16,7 @@ type EraseErrorService struct {
 
 // NewEraseErrorService is create erase error service.
 func NewEraseErrorService(db *sql.DB) EraseErrorService {
-	return EraseErrorService{pr: prepareRunner{preparer: db}}
+	return EraseErrorService{pr: newPrepareRunner(db)}
 }
 
 // TweetNotFoundIDs return not found tweet ids from argument ids.
