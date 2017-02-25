@@ -39,7 +39,7 @@ func run() int {
 		log.Error(err)
 		return 1
 	}
-	defer c.api.Close()
+	defer c.close()
 
 	if *csvFilePath != "" {
 		err = c.eraseCsv()
@@ -57,7 +57,12 @@ func run() int {
 }
 
 func newTweetEraseClient() (*tweetEraseClient, error) {
-	api, err := newAPI(configFilePath)
+	conf, err := config.LoadConfig(configFilePath)
+	if err != nil {
+		return nil, err
+	}
+
+	api, err := newAPI(conf)
 	if err != nil {
 		return nil, err
 	}
@@ -85,15 +90,10 @@ func newTweetEraseClient() (*tweetEraseClient, error) {
 	}
 
 	return &tweetEraseClient{
-		api: api, user: tu, eraseTweetService: ets, eraseErrorService: ees}, nil
+		config: conf, api: api, user: tu, db: db, eraseTweetService: ets, eraseErrorService: ees}, nil
 }
 
-func newAPI(path string) (*anaconda.TwitterApi, error) {
-	conf, err := config.LoadConfig(path)
-	if err != nil {
-		return nil, err
-	}
-
+func newAPI(conf *config.Config) (*anaconda.TwitterApi, error) {
 	anaconda.SetConsumerKey(conf.ConsumerKey)
 	anaconda.SetConsumerSecret(conf.ConsumerSecret)
 	return anaconda.NewTwitterApi(conf.AccessToken, conf.AccessTokenSecret), nil
@@ -109,7 +109,7 @@ func newDB() (*sql.DB, error) {
 		return nil, errors.Errorf("Fail db ping: %s.", err)
 	}
 
-	if err := mysql.SetMaxOpenConnsFromDB(db, 90); err != nil {
+	if err := mysql.SetMaxOpenConnsFromDB(db, 70); err != nil {
 		return nil, err
 	}
 
@@ -117,8 +117,10 @@ func newDB() (*sql.DB, error) {
 }
 
 type tweetEraseClient struct {
+	config            *config.Config
 	api               *anaconda.TwitterApi
 	user              *model.TwitterUser
+	db                *sql.DB
 	eraseTweetService model.EraseTweetService
 	eraseErrorService model.EraseErrorService
 }
@@ -282,7 +284,16 @@ func (c tweetEraseClient) eraseTweet(id uint64, wg *sync.WaitGroup, isErrCh chan
 
 	l := log.WithField("id", id)
 
-	t, err := c.api.DeleteTweet(int64(id), true)
+	// Create api.
+	api, err := newAPI(c.config)
+	if err != nil {
+		l.Errorf("Fail create api: %s", err)
+		isErrCh <- true
+		return
+	}
+	defer api.Close()
+
+	t, err := api.DeleteTweet(int64(id), true)
 	if err != nil {
 		insertID, insertErr := c.insertEraseError(id, err)
 		if insertID != 0 && insertErr == nil {
@@ -354,4 +365,14 @@ func (c tweetEraseClient) insertEraseError(tweetID uint64, err error) (uint64, e
 	}
 
 	return insertID, nil
+}
+
+func (c tweetEraseClient) close() error {
+	c.api.Close()
+
+	if err := c.db.Close(); err != nil {
+		return err
+	}
+
+	return nil
 }
