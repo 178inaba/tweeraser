@@ -126,6 +126,7 @@ func (s *eraseTweetTestSuite) TestInsert() {
 
 	s.Equal(1, cnt)
 	s.NoError(rows.Err())
+	s.NoError(rows.Close())
 
 	// Not exist user.
 	insertID, err = s.service.Insert(&model.EraseTweet{TwitterUserID: 3})

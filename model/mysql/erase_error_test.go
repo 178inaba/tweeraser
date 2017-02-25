@@ -114,6 +114,7 @@ func (s *eraseErrorSuite) TestInsert() {
 
 	s.Equal(1, cnt)
 	s.NoError(rows.Err())
+	s.NoError(rows.Close())
 }
 
 func (s *eraseErrorSuite) TearDownSuite() {

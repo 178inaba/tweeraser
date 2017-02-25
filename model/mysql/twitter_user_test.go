@@ -73,6 +73,7 @@ func (s *twitterUserSuite) TestInsertUpdate() {
 
 	s.Equal(1, cnt)
 	s.NoError(rows.Err())
+	s.NoError(rows.Close())
 
 	// Duplicate update.
 	tu = &model.TwitterUser{UserID: math.MaxUint64, Name: "name_dup"}
@@ -94,6 +95,7 @@ func (s *twitterUserSuite) TestInsertUpdate() {
 
 	s.Equal(1, cnt)
 	s.NoError(rows.Err())
+	s.NoError(rows.Close())
 }
 
 func (s *twitterUserSuite) TearDownSuite() {
