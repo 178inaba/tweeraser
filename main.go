@@ -109,7 +109,7 @@ func newDB() (*sql.DB, error) {
 		return nil, errors.Errorf("Fail db ping: %s.", err)
 	}
 
-	if err := mysql.SetMaxOpenConnsFromDB(db, 70); err != nil {
+	if err := mysql.SetMaxOpenConnsFromDB(db, 60); err != nil {
 		return nil, err
 	}
 
@@ -261,6 +261,11 @@ func (c tweetEraseClient) eraseTimeline() error {
 
 func (c tweetEraseClient) eraseIDs(ids []uint64) error {
 	trialCnt := 1000
+	idsLen := len(ids)
+	if idsLen < 1000 {
+		trialCnt = idsLen
+	}
+
 	for trialCnt > 0 {
 		wg := new(sync.WaitGroup)
 		for _, id := range ids[:trialCnt] {
