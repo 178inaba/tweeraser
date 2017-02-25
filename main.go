@@ -39,6 +39,7 @@ func run() int {
 		log.Error(err)
 		return 1
 	}
+	defer c.api.Close()
 
 	if *csvFilePath != "" {
 		err = c.eraseCsv()
