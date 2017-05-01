@@ -15,3 +15,7 @@ $ mysql -u root < misc/sql/create_test_db.sql
 $ mysql -u root tweeraser_test < misc/sql/ddl.sql
 $ go test ./...
 ```
+
+## License
+
+[MIT](LICENSE)
