@@ -3,7 +3,6 @@ sudo: false
 addons:
   mariadb: 10.2
 go:
-  - 1.6
   - 1.7
   - 1.8
   - master
